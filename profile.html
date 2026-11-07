@@ -122,6 +122,47 @@ footer{padding:2rem 0 3rem;color:var(--muted);font-size:.9rem}
   header.top .wrap{height:auto;padding-top:.7rem;padding-bottom:.7rem;flex-direction:column;align-items:flex-start;gap:.3rem}
   html{scroll-padding-top:6.5rem}
 }
+
+/* ===== floating "interactive world" guide (monitor avatar + chat bubble) ===== */
+.gui{position:fixed;right:1.25rem;bottom:1.25rem;z-index:20;display:flex;flex-direction:column;align-items:flex-end;gap:.8rem;transition:opacity .6s,transform .6s cubic-bezier(.2,.8,.2,1)}
+.gui.pre{opacity:0;transform:translateY(24px)}
+.gui-bubble{position:relative;width:min(17rem,calc(100vw - 2.5rem));padding:.9rem 1rem 1rem;background:var(--surface);border:1px solid var(--line);border-radius:6px;box-shadow:0 12px 32px rgba(0,0,0,.2);transform-origin:bottom right;animation:nudge 2.6s ease-in-out infinite;transition:opacity .35s,transform .35s cubic-bezier(.2,.8,.2,1),visibility .35s}
+.gui-bubble::after{content:"";position:absolute;bottom:-7px;right:1.9rem;width:12px;height:12px;background:var(--surface);border-right:1px solid var(--line);border-bottom:1px solid var(--line);transform:rotate(45deg)}
+.gui.min .gui-bubble{opacity:0;visibility:hidden;transform:scale(.85) translateY(10px)}
+.gui-x{position:absolute;top:.2rem;right:.35rem;width:1.6rem;height:1.6rem;border:0;background:transparent;color:var(--muted);font-size:1.15rem;line-height:1;cursor:pointer;border-radius:3px}
+.gui-x:hover{color:var(--ink);background:var(--bg)}
+.gui-typing{display:none;gap:5px;padding:.45rem 0 .35rem;margin:0}
+.gui.typing .gui-typing{display:flex}
+.gui.typing .gui-msg,.gui.typing .gui-cta{display:none}
+.gui-typing i{width:7px;height:7px;border-radius:50%;background:var(--muted);animation:dot 1s infinite}
+.gui-typing i:nth-child(2){animation-delay:.15s}.gui-typing i:nth-child(3){animation-delay:.3s}
+.gui-msg{margin:0 1.4rem .75rem 0;font-size:.93rem;line-height:1.5;animation:up .4s}
+.gui-msg b{font-weight:600}
+.gui-cta{display:inline-block;padding:.45rem .9rem;font-size:.88rem;animation:up .4s}
+.gui-avatar{position:relative;display:block;width:4.4rem;height:4.4rem;padding:.35rem;background:var(--surface);border:1px solid var(--accent);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.2);animation:bob 3.2s ease-in-out infinite}
+.gui-avatar::after{content:"";position:absolute;inset:-1px;border:2px solid var(--accent);border-radius:10px;opacity:0;animation:ring 2.4s ease-out infinite;pointer-events:none}
+.gui-avatar svg{display:block;width:100%;height:100%;transition:transform .25s}
+.gui-avatar:hover svg{transform:scale(1.12) rotate(-4deg)}
+.gui-avatar.wiggle svg{animation:wig .9s}
+.gui-avatar .on{position:absolute;top:-5px;right:-5px;width:.75rem;height:.75rem;border-radius:50%;background:var(--run);border:2px solid var(--bg);animation:dot 1.6s infinite}
+.m-screen{fill:var(--term-bg);stroke:var(--accent);stroke-width:2.5}
+.m-stand{fill:var(--accent)}
+.m-eye,.m-mouth{fill:var(--run)}
+.m-mouth{fill:none;stroke:var(--run);stroke-width:2.5;stroke-linecap:round}
+.m-eye{transform-box:fill-box;transform-origin:center;animation:blink 4s infinite}
+.m-eyes{transform:translate(var(--ex,0px),var(--ey,0px));transition:transform .15s}
+.gui.left{right:auto;left:1.25rem;align-items:flex-start}
+.gui.left .gui-bubble{transform-origin:bottom left}
+.gui.left .gui-bubble::after{right:auto;left:1.9rem}
+@keyframes bob{50%{transform:translateY(-6px)}}
+@keyframes ring{0%{opacity:.7;transform:scale(1)}100%{opacity:0;transform:scale(1.55)}}
+@keyframes nudge{50%{translate:0 4px}}
+@keyframes dot{50%{opacity:.3}}
+@keyframes up{from{opacity:0;transform:translateY(6px)}}
+@keyframes blink{0%,92%,100%{transform:scaleY(1)}96%{transform:scaleY(.1)}}
+@keyframes wig{20%{transform:rotate(-10deg)}40%{transform:rotate(9deg)}60%{transform:rotate(-6deg)}80%{transform:rotate(4deg)}}
+@media (max-width:820px){.gui{right:.9rem;bottom:.9rem}.gui-avatar{width:3.8rem;height:3.8rem}footer{padding-bottom:6.5rem}}
+@media (prefers-reduced-motion:reduce){.gui,.gui *,.gui *::after{animation:none!important;transition:none!important}}
 </style>
 </head>
 <body>
@@ -279,7 +320,7 @@ HPC System”, at Supercomputing India 2025 (SCI 2025).</li>
       </article>
 
        <article class="proj">
-        <h3><a href="https://github.com/your-username/slurm-efficiency"> AI Factory – SLINKY (Kubernetes + Slurm) Setup</a></h3>
+        <h3><a href=" AI_Factory_slinky.html"> AI Factory – SLINKY (Kubernetes + Slurm) Setup</a></h3>
         <p>Study and prototype of AI Factory infrastructure, with a hybrid scheduling model that lets Kubernetes and
 Slurm share the same compute.</p>
         <dl class="facts">
@@ -334,5 +375,51 @@ System”. <a href="https://lnkd.in/p/dtbEiciU">Linkedin Post</a></span></li>
 <footer>
   <div class="wrap"> anuj_m - github </div>
 </footer>
+
+<!-- Interactive world guide. EDIT: set both href values below to your interactive world page (e.g. interactive-world.html).
+     To move it to the left side, change class="gui" to class="gui left". Add target="_blank" rel="noopener" to open in a new tab. -->
+<aside class="gui" id="gui" aria-label="Interactive world shortcut">
+  <div class="gui-bubble">
+    <button class="gui-x" type="button" aria-label="Hide message">&times;</button>
+    <p class="gui-typing" aria-hidden="true"><i></i><i></i><i></i></p>
+    <p class="gui-msg" aria-live="polite">Psst, there is a GUI version of this portfolio. <b>Step into my interactive world.</b></p>
+    <a class="btn primary gui-cta" href="anuj-m-interactive-v3.html">Enter interactive world</a>
+  </div>
+  <a class="gui-avatar" href="anuj-m-interactive-v3.html" aria-label="Open the interactive world">
+    <svg viewBox="0 0 72 72" aria-hidden="true">
+      <rect class="m-screen" x="6" y="6" width="60" height="42" rx="6"/>
+      <g class="m-eyes"><rect class="m-eye" x="22" y="19" width="7" height="11" rx="3.5"/><rect class="m-eye" x="43" y="19" width="7" height="11" rx="3.5"/></g>
+      <path class="m-mouth" d="M28 38q8 6 16 0"/>
+      <rect class="m-stand" x="31" y="48" width="10" height="9"/>
+      <rect class="m-stand" x="20" y="57" width="32" height="6" rx="3"/>
+    </svg>
+    <span class="on" aria-hidden="true"></span>
+  </a>
+</aside>
+
+<script>
+(function(){
+var g=document.getElementById("gui"),av=g.querySelector(".gui-avatar"),
+rm=matchMedia("(prefers-reduced-motion:reduce)").matches;
+g.classList.add("pre");
+setTimeout(function(){
+g.classList.remove("pre");g.classList.add("typing");
+setTimeout(function(){g.classList.remove("typing")},rm?0:1400);
+},rm?0:1200);
+g.querySelector(".gui-x").onclick=function(){g.classList.add("min")};
+function show(){g.classList.remove("min")}
+av.addEventListener("mouseenter",show);av.addEventListener("focus",show);
+if(!rm){
+addEventListener("pointermove",function(e){
+var r=av.getBoundingClientRect(),dx=e.clientX-(r.left+r.width/2),dy=e.clientY-(r.top+r.height/2),d=Math.max(1,Math.hypot(dx,dy));
+av.style.setProperty("--ex",(dx/d*2.5)+"px");av.style.setProperty("--ey",(dy/d*2)+"px");
+});
+setInterval(function(){
+if(!g.classList.contains("min"))return;
+av.classList.add("wiggle");setTimeout(function(){av.classList.remove("wiggle")},900);
+},20000);
+}
+})();
+</script>
 </body>
 </html>

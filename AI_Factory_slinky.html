@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AI Factory: Slurm–Kubernetes Integration, Project Report</title>
+<style>
+:root{--bg:#ffffff;--ink:#1d2433;--muted:#5b6478;--line:#dde1e9;--soft:#f4f6f9;--accent:#1f4fbf;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#10151f;--ink:#e6e9f0;--muted:#98a1b5;--line:#2a3345;--soft:#182030;--accent:#8aa9ff;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#10151f;--ink:#e6e9f0;--muted:#98a1b5;--line:#2a3345;--soft:#182030;--accent:#8aa9ff;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.7 Georgia,"Times New Roman",serif}
+main{max-width:720px;margin:0 auto;padding:48px 20px 72px}
+h1,h2,h3,th{font-family:system-ui,-apple-system,"Segoe UI",Helvetica,Arial,sans-serif}
+h1{font-size:clamp(26px,5vw,34px);line-height:1.2;margin:0 0 8px}
+.meta{color:var(--muted);font:15px system-ui,sans-serif;margin:0 0 6px}
+h2{font-size:22px;margin:40px 0 10px;padding-top:20px;border-top:1px solid var(--line)}
+h3{font-size:17px;margin:22px 0 6px}
+p{margin:0 0 14px}
+ul,ol{padding-left:22px;margin:0 0 14px}
+li{margin-bottom:5px}
+code{font:14px ui-monospace,Menlo,Consolas,monospace;background:var(--soft);padding:1px 5px;border-radius:3px}
+.scroll{overflow-x:auto;margin:8px 0 18px}
+table{border-collapse:collapse;width:100%;min-width:480px;font-size:15px;line-height:1.5}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:14px;color:var(--muted);background:var(--soft)}
+.note{background:var(--soft);border-left:4px solid var(--accent);padding:12px 16px;margin:14px 0}
+</style>
+</head>
+<body>
+<main>
+<h1>AI Factory: Slurm–Kubernetes Integration with Slinky Slurm Bridge</h1>
+<p class="meta">Project report · HPC Technologies Group, C-DAC Pune · November 2026</p>
+<p class="meta">Status: research, study and testing phase</p>
+
+<h2>Summary</h2>
+<p>An AI Factory needs HPC-grade scheduling for model training and cloud-native orchestration for serving models. This project studied how to run both on one cluster without replacing the Slurm scheduler already in use.</p>
+<p>We evaluated the open-source Slinky framework from SchedMD, compared its two models (Slurm Operator and Slurm Bridge), and selected <b>Slurm Bridge</b>. On a small testbed we tested two workflows: a training job submitted through Slurm, and an inference service scheduled through the Bridge and served by Kubernetes. Both worked. The tests also showed limits we still need to resolve, mainly whole-node allocation per pod, CPU isolation and GPU visibility inside pods.</p>
+
+<h2>Why integration is needed</h2>
+<p>An AI Factory covers the full AI lifecycle on shared compute: data preparation, training, experiment tracking, model registry, deployment, inference and monitoring. Slurm and Kubernetes each cover part of it.</p>
+<div class="scroll"><table>
+<thead><tr><th></th><th>Slurm</th><th>Kubernetes</th></tr></thead>
+<tbody>
+<tr><th>Strengths</th><td>Multi-node jobs, MPI and GPU-aware scheduling, topology awareness, gang scheduling, queues, fair-share, reservations, accounting</td><td>Declarative containers, service exposure, health probes, auto-restart, autoscaling, RBAC, a large tooling ecosystem</td></tr>
+<tr><th>Gaps</th><td>Built around allocated jobs. No native persistent serving, REST APIs, dashboards or model registry</td><td>Not MPI-aware, no HPC topology awareness, no fair-share or batch queue semantics, limited accounting</td></tr>
+</tbody></table></div>
+<p>Running both side by side means two schedulers competing for the same nodes. The aim is to keep Slurm as the single resource allocator and let Kubernetes place pods on what Slurm allocates.</p>
+
+<h2>Slinky and the choice of Slurm Bridge</h2>
+<p>Slinky offers two components. The <b>Slurm Operator</b> runs and manages Slurm inside Kubernetes. The <b>Slurm Bridge</b> connects Kubernetes to an existing Slurm cluster, so pods are scheduled using Slurm resource allocations.</p>
+<p>The AI Factory already has a working Slurm cluster, so we selected Slurm Bridge. It reuses Slurm’s scheduling policies, runs native Kubernetes applications, and needs no cluster replacement.</p>
+
+<h2>Architecture</h2>
+<p>A pod request moves through three layers, and the allocation result returns the same way.</p>
+<ol>
+<li><b>Kubernetes control plane.</b> The API server accepts the pod YAML. An admission webhook applies the Bridge configuration, such as <code>schedulerName</code>.</li>
+<li><b>Slurm Bridge.</b> The Bridge scheduler handles pending pods and requests Slurm allocations. State coordination tracks the pod-to-job mapping and cleanup.</li>
+<li><b>Existing Slurm cluster.</b> The controller (<code>slurmctld</code>) applies policies and partitions through the Slurm REST API (<code>slurmrestd</code>). Compute nodes run <code>slurmd</code> and <code>kubelet</code>.</li>
+</ol>
+<h3>Testbed</h3>
+<div class="scroll"><table>
+<thead><tr><th>Node</th><th>Slurm role</th><th>Kubernetes role</th></tr></thead>
+<tbody>
+<tr><td>MASTER</td><td>Slurm controller</td><td>Control plane</td></tr>
+<tr><td>CN01</td><td>Slurm compute</td><td>Worker</td></tr>
+<tr><td>CN02</td><td>Slurm compute</td><td>Worker</td></tr>
+</tbody></table></div>
+<p>Slurm uses two partitions, <code>standard</code> and <code>slurm-bridge</code>. Kubernetes runs on kubeadm with containerd and Flannel. Pods use <code>slurm-bridge-scheduler</code>, and Slurm allocations are evaluated together with DRA (Dynamic Resource Allocation).</p>
+
+<h2>Implementation</h2>
+<ol>
+<li>Configure the Slurm cluster: <code>slurmctld</code>, <code>slurmd</code>, compute nodes and the <code>slurm-bridge</code> partition.</li>
+<li>Deploy Kubernetes: control plane, workers, containerd and CNI networking.</li>
+<li>Enable the Slurm REST API with authentication and connectivity.</li>
+<li>Install the Slinky Slurm Bridge scheduler and admission components with Helm.</li>
+<li>Align <code>schedulerName</code>, partitions, node taints, CPU/GPU resources and DRA.</li>
+<li>Submit a test pod and check Kubernetes placement against the Slurm allocation.</li>
+</ol>
+<p>The main setup challenges were aligning Kubernetes scheduling with Slurm partitions, making CPU/GPU allocation efficient, and securing communication between the two systems. These were handled with a dedicated Bridge scheduler setup, DRA configuration, and authenticated <code>slurmrestd</code> access with end-to-end pod-to-node mapping checks.</p>
+
+<h2>Workflows</h2>
+<h3>Training through Slurm</h3>
+<p>The user submits <code>sbatch train.sbatch</code> with CPU, GPU, memory and time needs. Slurm checks partitions, priorities and policies, allocates compute nodes, and the training script runs there. The model files are saved to storage and Slurm releases the resources.</p>
+<h3>Inference through the Bridge</h3>
+<p>The user submits pod YAML with the Bridge <code>schedulerName</code>. The Bridge reads the pod’s requirements and requests a Slurm allocation through <code>slurmrestd</code>. Slurm allocates node(s) under its policies, the Bridge binds the pod to them, and the kubelet starts the serving container. Slurm allocates resources, the Bridge coordinates placement, and Kubernetes manages the container lifecycle.</p>
+<p>The design targets LLM serving, for example with vLLM or TGI. The tests used a lightweight model, as described below.</p>
+
+<h2>Test results and limitations</h2>
+<div class="scroll"><table>
+<thead><tr><th>Test</th><th>Observation</th></tr></thead>
+<tbody>
+<tr><td>HPC model training</td><td>Slurm <code>sbatch</code> training ran and generated <code>model.pkl</code> and <code>model_info.json</code></td></tr>
+<tr><td>Inference submission</td><td>Deployment used <code>slurm-bridge-scheduler</code> and Kubernetes probes</td></tr>
+<tr><td>Scheduling verification</td><td>A Bridge-associated Slurm job ID and node allocation were observed</td></tr>
+<tr><td>Service response</td><td>An Iris model service exposed through a NodePort returned an HTTP response</td></tr>
+</tbody></table></div>
+<p>Early tests showed the Bridge reserving a whole compute node for one pod, even for a small request such as 2 CPUs on a 16-CPU node. We diagnosed a CPU DRA allocation mismatch, aligned the pod and Slurm node allocation, and validated the admission and scheduling flow. The target is shared, granular allocation, where several pods use one node.</p>
+<div class="note"><b>Open items.</b> Whole-node allocation per pod was still observed. CPU DRA isolation and GPU device visibility need further work. Multi-replica scaling is limited by node availability on a two-compute-node testbed. The results show that the approach works, not how it performs at scale.</div>
+
+<p>Slinky Slurm Bridge is a workable way to let Slurm and Kubernetes share one cluster, with Slurm as the single allocator. The next step is to close the open items above, then extend testing toward larger node counts, fault tolerance, GPU sharing and multi-tenant use.</p>
+</main>
+</body>
+</html>
